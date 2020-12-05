@@ -320,15 +320,27 @@ class TSPSolver:
 
 		return result, lower_bound
 
+	def fancy(self, time_allowance=60.0):
+		# Calix
+		pass
 
+	def create_initial_population(self, population_size: int) -> List[TSPSolution]:
+		# Olya
+		# self._scenario.getCities()
+		pass
 
-''' <summary>
-	This is the entry point for the algorithm you'll write for your group project.
-	</summary>
-	<returns>results dictionary for GUI that contains three ints: cost of best solution, 
-	time spent to find best solution, total number of solutions found during search, the 
-	best solution found.  You may use the other three field however you like.
-	algorithm</returns> 
-'''
-	# def fancy(self, time_allowance=60.0):
-	# 	pass
+	def select_parents(self, population: List[TSPSolution]) -> List[TSPSolution]:
+		# Calix
+		pass
+
+	def crossover(self, solution_one: TSPSolution, solution_two: TSPSolution) -> TSPSolution:
+		# Alex
+		pass
+
+	def mutation(self, solution: TSPSolution) -> TSPSolution:
+		# Alex
+		pass
+
+	def select_next_generation(self, population: List[TSPSolution], children: List[TSPSolution]) -> List[TSPSolution]:
+		# Olya
+		pass
