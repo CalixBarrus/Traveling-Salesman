@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import copy
 from typing import List
 
 from which_pyqt import PYQT_VER
@@ -335,11 +336,74 @@ class TSPSolver:
 
 	def crossover(self, solution_one: TSPSolution, solution_two: TSPSolution) -> TSPSolution:
 		# Alex
-		pass
+		# Get size of sublist, no longer than half the solution length
+		for child_attempt_number in range(25):
+			route_size = len(solution_one.route)
+			sublist_size = random.randint(1, math.floor(route_size / 2))
+
+			# Get index of sublist for solution_one and solution_two
+			index_one = random.randrange(0, route_size - sublist_size)
+			index_two = random.randrange(0, route_size - sublist_size)
+
+			# Get sublist from solution_one and solution_two
+			sublist_one = solution_one.route[index_one:index_one + sublist_size]
+			sublist_two = solution_two.route[index_one:index_one + sublist_size]
+
+			child_one_route = copy.deepcopy(solution_one.route)
+			child_two_route = copy.deepcopy(solution_two.route)
+
+			for i in range(sublist_size):
+				self.swap(
+					child_one_route,
+					solution_one.route.index(sublist_one[i]),
+					solution_one.route.index(sublist_two[i]))
+				self.swap(
+					child_two_route,
+					solution_two.route.index(sublist_one[i]),
+					solution_two.route.index(sublist_two[i]))
+
+			child_one = TSPSolution(child_one_route)
+			child_two = TSPSolution(child_two_route)
+
+			min_child = None
+			if child_one.cost <= child_two.cost:
+				min_child = child_one
+			else:
+				min_child = child_two
+
+			if not np.isinf(min_child.cost):
+				return min_child
+		min_parent = None
+		if solution_one.cost <= solution_two.cost:
+			min_parent = solution_one
+		else:
+			min_parent = solution_two
+		return min_parent
+
+	# Helper function to swap values in given list at given indexes
+	def swap(self, swap_list, index_one, index_two):
+		temp = swap_list[index_one]
+		swap_list[index_one] = swap_list[index_two]
+		swap_list[index_two] = temp
 
 	def mutation(self, solution: TSPSolution) -> TSPSolution:
 		# Alex
-		pass
+		for mutation_attempt_number in range(25):
+			route_size = len(solution.route)
+
+			index_one = random.randrange(0, route_size)
+			index_two = random.randrange(0, route_size)
+			while index_two is index_one:
+				index_two = random.randrange(0, route_size)
+
+			mutation_route = copy.deepcopy(solution.route)
+
+			self.swap(mutation_route, index_one, index_two)
+
+			mutation = TSPSolution(mutation_route)
+			if not np.isinf(mutation.cost):
+				return mutation
+		return solution
 
 	def select_next_generation(self, population: List[TSPSolution], children: List[TSPSolution]) -> List[TSPSolution]:
 		# Olya
