@@ -413,4 +413,4 @@ class TSPSolver:
 		# Olya
 		next_generation = sorted(population + children, key=lambda route: route['cost'])
 
-		return next_generation[:len(population)-1]
+		return next_generation[:len(population)]
