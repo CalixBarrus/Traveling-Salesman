@@ -327,8 +327,12 @@ class TSPSolver:
 
 	def create_initial_population(self, population_size: int) -> List[TSPSolution]:
 		# Olya
-		# self._scenario.getCities()
-		pass
+		population = []
+
+		for i in range(0, population_size):
+			population.append(self.defaultRandomTour())
+
+		return population
 
 	def select_parents(self, population: List[TSPSolution]) -> List[TSPSolution]:
 		# Calix
