@@ -411,4 +411,6 @@ class TSPSolver:
 
 	def select_next_generation(self, population: List[TSPSolution], children: List[TSPSolution]) -> List[TSPSolution]:
 		# Olya
-		pass
+		next_generation = sorted(population + children, key=lambda route: route['cost'])
+
+		return next_generation[:len(population)-1]
