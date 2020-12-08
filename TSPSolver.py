@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import copy
+import logging.config
 from typing import List
 
 from which_pyqt import PYQT_VER
@@ -10,7 +11,9 @@ elif PYQT_VER == 'PYQT4':
 else:
 	raise Exception('Unsupported Version of PyQt: {}'.format(PYQT_VER))
 
-
+# Set up logger
+logging.config.fileConfig("./logging.conf")
+logger = logging.getLogger(__name__)
 
 
 import time
@@ -321,22 +324,95 @@ class TSPSolver:
 
 		return result, lower_bound
 
-	def fancy(self, time_allowance=60.0):
+	def fancy(self, time_allowance: int=60.0):
+		"""
+		Genetic Algorithm solution to the Traveling Salesman Problem. This
+		method creates a number of routes, chooses the best routes, creates
+		children by crossing over successful routes and mutating them, and then
+		selects the next generation so the process can repeat. The algorithm runs
+		until the time runs out, and then returns the best route found.
+
+		:param time_allowance:
+		:return: Dictionary of values to for the GUI
+		"""
 		# Calix
-		pass
+
+		########################################################################
+		# Parameters
+		population_size = 21
+		num_parents = 7
+		# With num_parents = n, we will produce C(2, n) children per iteration
+		# where C(k, n) are the number of combinations 'n choose k'.
+		crossover = True
+		mutation = True
+		########################################################################
+
+		results = {}
+		count = 0 # Number of times the algorithm found an improved bssf
+		total = 0 # Total number of solutions generated and considered
+
+		start_time = time.time()
+
+		logger.info("Initializing population with {} individuals.".format(population_size))
+		population = self.create_initial_population(population_size)
+		total += len(population)
+		bssf = population[0] # Let the bssf be a random solution
+
+		while time.time()-start_time < time_allowance:
+			parents = self.select_parents(population, num_parents)
+
+			# Have every pair of parents produce a child.
+			children = []
+			if crossover:
+				for pairing in itertools.combinations(parents, 2):
+					children.append(self.crossover(*pairing))
+			else:
+				children = parents.copy()
+
+			if mutation:
+				for i in range(len(children)):
+					children[i] = self.mutation(children[i])
+
+			total += len(children)
+
+			population = self.select_next_generation(population, children)
+
+			if bssf.cost < population[0].cost:
+				bssf = population[0]
+				count += 1
+				logger.debug("Found improved route")
+
+		end_time = time.time()
+		results['cost'] = bssf.cost
+		results['time'] = end_time - start_time
+		results['count'] = count
+		results['soln'] = bssf
+		results['max'] = None
+		results['total'] = total
+		results['pruned'] = None
+		return results
+
 
 	def create_initial_population(self, population_size: int) -> List[TSPSolution]:
 		# Olya
 		population = []
 
 		for i in range(0, population_size):
-			population.append(self.defaultRandomTour())
+			population.append(self.defaultRandomTour()['soln'])
 
 		return population
 
-	def select_parents(self, population: List[TSPSolution]) -> List[TSPSolution]:
+	def select_parents(self, population: List[TSPSolution], num_parents: int) -> List[TSPSolution]:
+		"""
+		Select the best parents from the population.
+		:param population:
+		:param num_parents:
+		:return: Sublist of the chosen individuals to be parents
+		"""
 		# Calix
-		pass
+		population = sorted(population, key=lambda solution: solution.cost)
+
+		return population[:num_parents]
 
 	def crossover(self, solution_one: TSPSolution, solution_two: TSPSolution) -> TSPSolution:
 		# Alex
@@ -353,8 +429,11 @@ class TSPSolver:
 			sublist_one = solution_one.route[index_one:index_one + sublist_size]
 			sublist_two = solution_two.route[index_one:index_one + sublist_size]
 
-			child_one_route = copy.deepcopy(solution_one.route)
-			child_two_route = copy.deepcopy(solution_two.route)
+			# child_one_route = copy.deepcopy(solution_one.route)
+			# child_two_route = copy.deepcopy(solution_two.route)
+
+			child_one_route = solution_one.route
+			child_two_route = solution_two.route
 
 			for i in range(sublist_size):
 				self.swap(
@@ -411,6 +490,6 @@ class TSPSolver:
 
 	def select_next_generation(self, population: List[TSPSolution], children: List[TSPSolution]) -> List[TSPSolution]:
 		# Olya
-		next_generation = sorted(population + children, key=lambda route: route['cost'])
+		next_generation = sorted(population + children, key=lambda soln: soln.cost)
 
 		return next_generation[:len(population)]

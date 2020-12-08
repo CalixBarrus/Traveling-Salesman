@@ -177,3 +177,6 @@ class City:
 
 		return int(math.ceil(cost * self.MAP_SCALE))
 
+	def __str__(self):
+		return "City name: " + self._name
+
