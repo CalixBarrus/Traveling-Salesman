@@ -397,8 +397,10 @@ class TSPSolver:
 		# Olya
 		population = []
 
-		for i in range(0, population_size):
+		for i in range(0, population_size - 1):
 			population.append(self.defaultRandomTour()['soln'])
+
+		population.append(self.greedy()['soln'])
 
 		return population
 
@@ -417,7 +419,7 @@ class TSPSolver:
 	def crossover(self, solution_one: TSPSolution, solution_two: TSPSolution) -> TSPSolution:
 		# Alex
 		# Get size of sublist
-		for child_attempt_number in range(25):
+		for child_attempt_number in range(50):
 			route_size = len(solution_one.route)
 			sublist_size = random.randint(1, min(5, route_size))
 
@@ -471,7 +473,7 @@ class TSPSolver:
 
 	def mutation(self, solution: TSPSolution) -> TSPSolution:
 		# Alex
-		for mutation_attempt_number in range(25):
+		for mutation_attempt_number in range(50):
 			route_size = len(solution.route)
 
 			index_one = random.randrange(0, route_size)
