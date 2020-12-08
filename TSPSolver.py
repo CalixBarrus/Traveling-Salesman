@@ -419,7 +419,7 @@ class TSPSolver:
 		# Get size of sublist, no longer than half the solution length
 		for child_attempt_number in range(25):
 			route_size = len(solution_one.route)
-			sublist_size = random.randint(1, math.floor(route_size / 2))
+			sublist_size = random.randint(1, 3)
 
 			# Get index of sublist for solution_one and solution_two
 			index_one = random.randrange(0, route_size - sublist_size)
