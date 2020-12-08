@@ -89,6 +89,7 @@ class TSPSolver:
 	def greedy( self,time_allowance=60.0 ):
 		results = {}
 		cities = self._scenario.getCities()
+		random.shuffle(cities)
 		ncities = len(cities)
 		foundTour = False
 		count = 0
@@ -395,12 +396,15 @@ class TSPSolver:
 
 	def create_initial_population(self, population_size: int) -> List[TSPSolution]:
 		# Olya
+		number_initial_greedy = math.ceil(population_size / 2)
+
 		population = []
 
-		for i in range(0, population_size - 1):
+		i = 0
+		for i in range(0, number_initial_greedy):
+			population.append(self.greedy()['soln'])
+		for i in range(i, population_size):
 			population.append(self.defaultRandomTour()['soln'])
-
-		population.append(self.greedy()['soln'])
 
 		return population
 
