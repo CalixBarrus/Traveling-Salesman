@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import copy
 import logging.config
+import queue
 from typing import List
 
 from which_pyqt import PYQT_VER
@@ -130,200 +131,86 @@ class TSPSolver:
 		max queue size, total number of states created, and number of pruned states.</returns> 
 	'''
 
-	def branchAndBound( self, time_allowance=60.0 ):
+	def branchAndBound(self, time_allowance=60.0):
+		# Time and Space O(n!): At worst case it is as bad as brute force,
+		#   however in practice it is much faster
 		results = {}
 		cities = self._scenario.getCities()
 		ncities = len(cities)
 		count = 0
-		start_time = time.time()
-
-		# Helper class that will be in the queue
-		class State:
-			"""
-			State class represents partial solution to the TSP problem
-
-			route: List of cities representing the route constructed so far
-			reduced_cost_matrix: matrix of costs between graph vertices. Used to
-			calculate and update the lower_bound
-			lower_bound: Pessimistic lower bound on solutions to the TSP along
-			this partial route.
-			"""
-			def	__init__(self, route: List, reduced_cost_matrix: np.ndarray, lower_bound: int):
-				"""
-				This has O(1) temporal complexity and O(n^2) spatial complexity.
-				:param route: List of cities
-				:param reduced_cost_matrix: Reduced cost matrix updated with
-				respect to the cities currently in the route
-				:param lower_bound: Lower bound for the TSP updated with respect
-				to the given reduced_cost_matrix
-				"""
-				self.route = route
-				self.reduced_cost_matrix = reduced_cost_matrix
-				self.lower_bound = lower_bound
-			# def __lt__(self, other):
-			# 	return self.lower_bound < other.lower_bound
-
-			def update_route(self, new_city: City) -> None:
-				"""
-				Add the city to the route and update the reduced_cost_matrix and
-				lower_bound accordingly
-
-				O(n^2) temporal complexity and O(1) spaitial complexity (given
-				that that cost has already been paid in the constructor).
-
-				:param new_city: City to be added to the route.
-				"""
-				city_index = cities.index(new_city)
-				prev_index = cities.index(self.route[-1])
-
-				# Account for the cost of traveling to the given city
-				self.lower_bound += self.reduced_cost_matrix[prev_index, city_index]
-				# Cancel the column from which we travel
-				self.reduced_cost_matrix[prev_index, :] = np.infty
-				# And the column to which we now travel
-				self.reduced_cost_matrix[:, city_index] = np.infty
-
-				self.route.append(new_city)
-
-				# Make sure there is a 0 in each column and row. Subtract from
-				# the entire column the least element to make it so, if necessary.
-				n = len(self.reduced_cost_matrix)
-				for i in range(n):
-					min_index = np.argmin(self.reduced_cost_matrix[i, :])
-					if self.reduced_cost_matrix[i, min_index] == np.infty:
-						# If a row or column not on the route has only infinities, there
-						# is no valid tour given the route so far.
-						if i not in [city._index for city in self.route[:len(self.route)-1]]:
-							self.lower_bound = np.infty
-					elif self.reduced_cost_matrix[i, min_index] > 0:
-						self.lower_bound += self.reduced_cost_matrix[i, min_index]
-						self.reduced_cost_matrix[i, :] -= self.reduced_cost_matrix[i, min_index]
-
-				for i in range(n):
-					min_index = np.argmin(self.reduced_cost_matrix[:, i])
-					if self.reduced_cost_matrix[min_index, i] == np.infty:
-						if i not in [city._index for city in self.route[1:]]:
-							self.lower_bound = np.infty
-					elif self.reduced_cost_matrix[min_index, i] > 0:
-						self.lower_bound += self.reduced_cost_matrix[min_index, i]
-						self.reduced_cost_matrix[:, i] -= self.reduced_cost_matrix[min_index, i]
-
-
-			def child_state(self, new_city):
-				"""
-				Spin of a state similar to the current problem state but with
-				an additional city added to the route.
-				O(n^2) temporal complexity and O(n^2) spatial complexity due to
-				the creation of a whole new reduced_cost_matrix.
-				:param new_city: City to be added to the route
-				:return: Child problem state of the current State
-				"""
-				result = State(list(self.route), np.array(self.reduced_cost_matrix), self.lower_bound)
-				result.update_route(new_city)
-				return result
-
-		cost_matrix, lower_bound = self._create_cost_matrix(cities, 0)  # O(n^2) temporally and spatially
-		initial_problem = State([cities[0]], cost_matrix, lower_bound)  # O(n^2) temporally and spatially
+		pruned = 0
 		total = 0
-		self.cost_queue = [ (initial_problem.lower_bound, total, initial_problem) ]
-		deepest_state = None # Keep track of the best, deepest state seen so far
+		max_size = 1
+		start_time = time.time()
+		# To get the initial BSSF I used a random tour
+		# Time and space O(n!): worst case search all of the n! possibilities
+		self._bssf = self.greedy()['soln']
+		rcm = [[from_city.costTo(to_city) for to_city in cities] for from_city in cities]
+		first_node = TSPNode(0, [0], rcm)
+		first_node.calculateRCM()
 		total += 1
 
-		# best solution so far
-		self.bssf = self.greedy()['soln'] # Worst case O(n^2) temporally, avg. case O(n) temporally. O(n) spatially in any case.
+		# The priority queue I used is queue.PriorityQueue(). The way I use it, I put
+		#   PrioritizedItem's into it that have a priority(taken from the TSPNode) and
+		#   an item which is not ordered and contains the actual TSPNode.
+		#   queue.PriorityQueue() uses a heap, so operations are log(n)
+		priority_queue = queue.PriorityQueue()
+		# Time and Space O(log(n)): priority queue uses a heap, so operations are log(n)
+		priority_queue.put(PrioritizedItem(first_node.priority, first_node))
 
-		cost_or_depth = True
-		max_queue_length = 0
-		states_trimmed = 0
-		while not len(self.cost_queue) == 0 and time.time()-start_time < time_allowance:
-			# Alternate prioritizing lower bound or tree depth
-			if 0 != np.random.randint(0, 10): # About 1 in 10 times look at the deepest state
-				current = heapq.heappop(self.cost_queue)[2] # O(log(n)) temporally
-				if deepest_state is not None and current == deepest_state[2]:
-					deepest_state = None
-			else:
-				if deepest_state == None:
-					current = heapq.heappop(self.cost_queue)[2] # O(log(n)) temporally
-				else:
-					current = deepest_state[2]
-					self.cost_queue.remove(deepest_state) # O(n) temporally
-					deepest_state = None
-					heapq.heapify(self.cost_queue) # O(n) temporally
-
-			if current.lower_bound > self.bssf.cost:
-				states_trimmed += 1
+		# Time and Space O(n!): at worst explore each of the n! possibilities
+		while (not priority_queue.empty()) and time.time() - start_time < time_allowance:
+			# Time and Space O(log(n)): priority queue uses a heap, so operations are log(n)
+			current_node = priority_queue.get().item
+			current_city_index = current_node.path[-1]
+			if current_node.bound >= self._bssf.cost:
 				continue
-
-			# Complete tours will skip this for loop
-			# At worst, this loop (combined with the outer loop) will go through all n! different partial tour possibilites
-			for city in np.setdiff1d(cities, current.route, assume_unique=True):  # Look at cities not in the route
-				if current.route[-1].costTo(city) == np.infty: # No edge to city
+			# Time and Space O(n): At worst this loop expands to n more possibilities
+			for j in range(ncities):
+				from_current = current_node.rcm[current_city_index][j]
+				if np.isinf(from_current):
 					continue
-
-				child = current.child_state(city) # O(n^2) temporally and spatially
-				if child.lower_bound < self.bssf.cost:
-					new_state = (child.lower_bound, total, child)
-					heapq.heappush(self.cost_queue, new_state) # O(log n)
-
-					# Remember the best, deepest state
-					if deepest_state is None:
-						deepest_state = new_state
-					elif len(new_state[2].route) >= len(deepest_state[2].route) and new_state[0] > deepest_state[0]:
-						deepest_state = new_state
-					total += 1
+				temp_path = copy.deepcopy(current_node.path)
+				temp_path.append(j)
+				temp_rcm = copy.deepcopy(current_node.rcm)
+				temp_node = TSPNode(current_node.bound + from_current,
+									temp_path,
+									temp_rcm)
+				temp_node.setInfinities(current_city_index, j)
+				# Time O(n^2): See calculateRCM method...
+				# Space O(1): See calculateRCM method...
+				temp_node.calculateRCM()
+				total += 1
+				if temp_node.bound >= self._bssf.cost:
+					# prune the node
+					pruned += 1
+					continue
+				if len(temp_node.path) == ncities:
+					# make node new best solution so far
+					temp_route = []
+					for i in temp_node.path:
+						temp_route.append(cities[i])
+					self._bssf = TSPSolution(temp_route)
+					count += 1
 				else:
-					states_trimmed += 1
+					# add node to the queue
+					# Time and Space O(log(n)): priority queue uses a heap, so operations are log(n)
+					priority_queue.put(PrioritizedItem(temp_node.priority, temp_node))
+					if priority_queue.qsize() > max_size:
+						max_size = priority_queue.qsize()
 
-			# Complete tours
-			if len(current.route) == ncities:
-				deepest_state = None
-				solution = TSPSolution(current.route)  # O(n)
-				count += 1
-				if solution.cost < self.bssf.cost:
-					self.bssf = solution
-					if len(self.cost_queue) > max_queue_length:
-						max_queue_length = len(self.cost_queue)
-
-
-		if len(self.cost_queue) > max_queue_length:
-			max_queue_length = len(self.cost_queue)
-
-		states_trimmed += len(self.cost_queue)
+		# Time and Space O(1): time's up prune the rest, just add size of queue
+		pruned += priority_queue.qsize()
 
 		end_time = time.time()
-		results['cost'] = self.bssf.cost
+		results['cost'] = self._bssf.cost
 		results['time'] = end_time - start_time
 		results['count'] = count
-		results['soln'] = self.bssf
-		results['max'] = max_queue_length
+		results['soln'] = self._bssf
+		results['max'] = max_size
 		results['total'] = total
-		results['pruned'] = states_trimmed
+		results['pruned'] = pruned
 		return results
-
-	def _create_cost_matrix(self, cities, starting_city_index) -> (np.ndarray, int):
-		"""
-		Temporal and spatial complexity O(n^2)
-		"""
-		n = len(cities)
-		lower_bound = 0
-		result = np.zeros((n, n))
-		for i in range(n):
-			for j in range(n):
-				result[i, j] = cities[i].costTo(cities[j])
-
-		for row in result:
-			min_index = np.argmin(row)
-			if row[min_index] != np.infty and row[min_index] > 0:
-				lower_bound += row[min_index]
-				row -= row[min_index]
-
-		for col in np.rollaxis(result, 1):
-			min_index = np.argmin(col)
-			if col[min_index] != np.infty and col[min_index] > 0:
-				lower_bound += col[min_index]
-				col -= col[min_index]
-
-		return result, lower_bound
 
 	def fancy(self, time_allowance: int=60.0):
 		"""
@@ -423,7 +310,7 @@ class TSPSolver:
 	def crossover(self, solution_one: TSPSolution, solution_two: TSPSolution) -> TSPSolution:
 		# Alex
 		# Get size of sublist
-		for child_attempt_number in range(50):
+		for child_attempt_number in range(45):
 			route_size = len(solution_one.route)
 			sublist_size = random.randint(1, min(5, route_size))
 
@@ -477,7 +364,7 @@ class TSPSolver:
 
 	def mutation(self, solution: TSPSolution) -> TSPSolution:
 		# Alex
-		for mutation_attempt_number in range(50):
+		for mutation_attempt_number in range(45):
 			route_size = len(solution.route)
 
 			index_one = random.randrange(0, route_size)

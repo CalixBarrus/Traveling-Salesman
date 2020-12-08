@@ -2,6 +2,9 @@
 
 
 import math
+from dataclasses import field, dataclass
+from typing import Any
+
 import numpy as np
 import random
 import time
@@ -185,3 +188,72 @@ class City:
 			return True
 		else:
 			return False
+
+
+class TSPNode:
+    # This is the Data Structure I used to describe search states
+    # Each node has a bound(the very best the path cost could be),
+    #   path(the path so far, a python list),
+    #   rcm(reduced cost matrix, a 2d python list),
+    #   and priority(the value the priority queue will use to order them)
+    def __init__(self, bound, path, rcm):
+        self.bound = bound
+        self.path = path
+        self.rcm = rcm
+        self.priority = bound - (325 * len(path))
+
+    def calculateRCM(self):
+        # Time O(n^2): calculate rows and columns of rcm
+        # Space O(1): space has already been purchased
+        temp_bound = self.bound
+
+        test = [float('inf') for x in range(10)]
+        min(test)
+
+        # Time O(n^2): calculate rows of rcm
+        # Space O(1): space has already been purchased
+        for i in range(len(self.rcm)):
+            minimum = min(self.rcm[i])
+            if np.isinf(minimum):
+                continue
+            temp_bound += minimum
+            self.rcm[i] = [x - minimum for x in self.rcm[i]]
+
+        # Time O(n^2): calculate columns of rcm
+        # Space O(1): space has already been purchased
+        for j in range(len(self.rcm)):
+            minimum = float('inf')
+            # find minimum value of column
+            for i in range(len(self.rcm)):
+                value = self.rcm[i][j]
+                if value < minimum:
+                    minimum = value
+            if np.isinf(minimum):
+                continue
+            # subtract minimum from column
+            temp_bound += minimum
+            for i in range(len(self.rcm)):
+                self.rcm[i][j] -= minimum
+
+            self.bound = temp_bound
+            # After trial and error, and help from a friend,
+            #   discovered self.bound - (325 * len(self.path))
+            #   makes for a pretty good mechanism for priority
+            #   to get it to dig deep.
+            self.priority = self.bound - (325 * len(self.path))
+
+    def setInfinities(self, row, column):
+        # Time O(n): turn one row and one column into infinity
+        # Space O(1): space has already been purchased
+        self.rcm[row] = [float('inf') for i in self.rcm[row]]
+
+        for i in range(len(self.rcm)):
+            self.rcm[i][column] = float('inf')
+
+        self.rcm[column][row] = float('inf')
+
+
+@dataclass(order=True)
+class PrioritizedItem:
+    priority: int
+    item: Any = field(compare=False)
