@@ -245,6 +245,7 @@ class TSPSolver:
 		population = self.create_initial_population(population_size)
 		total += len(population)
 		bssf = population[0] # Let the bssf be a random solution
+		rounds_since_change = 0
 
 		while time.time()-start_time < time_allowance:
 			parents = self.select_parents(population, num_parents)
@@ -266,9 +267,14 @@ class TSPSolver:
 			population = self.select_next_generation(population, children)
 
 			if bssf.cost > population[0].cost:
+				rounds_since_change = 0
 				bssf = population[0]
 				count += 1
 				logger.debug("Found improved route")
+			else:
+				rounds_since_change += 1
+			if rounds_since_change >= 30:
+				break
 
 		end_time = time.time()
 		results['cost'] = bssf.cost
@@ -322,11 +328,11 @@ class TSPSolver:
 			sublist_one = solution_one.route[index_one:index_one + sublist_size]
 			sublist_two = solution_two.route[index_two:index_two + sublist_size]
 
-			# child_one_route = copy.deepcopy(solution_one.route)
-			# child_two_route = copy.deepcopy(solution_two.route)
+			child_one_route = copy.deepcopy(solution_one.route)
+			child_two_route = copy.deepcopy(solution_two.route)
 
-			child_one_route = solution_one.route
-			child_two_route = solution_two.route
+			# child_one_route = solution_one.route
+			# child_two_route = solution_two.route
 
 			for i in range(sublist_size):
 				self.swap(
