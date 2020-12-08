@@ -427,7 +427,7 @@ class TSPSolver:
 
 			# Get sublist from solution_one and solution_two
 			sublist_one = solution_one.route[index_one:index_one + sublist_size]
-			sublist_two = solution_two.route[index_one:index_one + sublist_size]
+			sublist_two = solution_two.route[index_two:index_two + sublist_size]
 
 			# child_one_route = copy.deepcopy(solution_one.route)
 			# child_two_route = copy.deepcopy(solution_two.route)
