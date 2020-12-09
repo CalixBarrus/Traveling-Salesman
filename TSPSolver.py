@@ -289,7 +289,7 @@ class TSPSolver:
 
 	def create_initial_population(self, population_size: int) -> List[TSPSolution]:
 		# Olya
-		number_initial_greedy = math.ceil(population_size / 2)
+		number_initial_greedy = 2
 
 		population = []
 
