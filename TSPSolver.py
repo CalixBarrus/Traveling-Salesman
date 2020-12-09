@@ -289,7 +289,10 @@ class TSPSolver:
 
 	def create_initial_population(self, population_size: int) -> List[TSPSolution]:
 		# Olya
-		number_initial_greedy = 2
+		if len(self._scenario.getCities()) > 60:
+			number_initial_greedy = population_size
+		else:
+			number_initial_greedy = 2
 
 		population = []
 
